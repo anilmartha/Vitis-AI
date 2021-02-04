@@ -1,0 +1,53 @@
+{
+  "graph_name": "yolov3", 
+  
+  "node_list": [
+    {
+      "node_name": "yolov3_preproc", 
+      "node_params" : {
+        "DetectionImreadPreProcess": {
+          "net_w" : 608, 
+          "net_h" : 608, 
+          "net_c": 3
+        }
+      },
+      "next_node": ["yolov3_tvm"]
+    },
+    {
+      "node_name": "yolov3_tvm",
+      "node_params": {
+        "TvmKernel": {
+          "lib":      "/workspace/ci-tvm/byoc_submission/Relay-DarkNet-YoloV3_DPUCADX8G.so",
+          "input_name": "data", 
+          "in_dim": [ 1, 3, 608, 608],
+          "out_dim": [1, 255, 76, 76, 3,18, 6, 1, 255, 38, 38, 3, 18, 6, 1, 255, 19, 19, 3,18,6],
+          "out_order": [4,1,1,1, 4,1,1,1, 4,1,1, 1],
+	      "num_runners": 8
+        }
+      },
+      "next_node": ["yolov3_post"]
+    },
+
+    {
+      "node_name": "yolov3_post",
+      "node_params": {
+        "YoloPostProcessTVM": {
+          "yolo_version": 3,
+          "net_h":        608,
+          "net_w":        608,
+          "num_classes":  80,
+          "anchor_cnt":   3,
+          "conf_thresh":  0.5,
+          "iou_thresh":   0.45,
+          "biases":    [10,13,  16,30,  33,23,  30,61,  62,45,  59,119,  116,90,  156,198,  373,326]
+        }
+      },
+      "next_node": []
+    }
+
+       
+  ],
+  
+  "version": "0.1"
+}
+

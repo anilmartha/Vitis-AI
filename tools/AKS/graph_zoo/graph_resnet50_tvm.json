@@ -1,0 +1,53 @@
+{
+    "graph_name": "resnet50", 
+    
+    "node_list": [
+      {
+        "node_name": "preproc", 
+        "node_params" : {
+          "ClassificationImreadPreProcess": {
+            "net_w" : 224, 
+            "net_h" : 224, 
+            "net_c": 3,
+            "mean": [ 104.007, 116.669, 122.679]
+          }
+        },
+        "next_node": ["resnet50_tvm"]
+      },
+      
+      {
+        "node_name": "resnet50_tvm",
+        "node_params": {
+          "TvmKernel": {
+            "lib":      "/workspace/tools/AKS/tvm_caffe_resNet_v1_50_dpucadx8g_num_fpgas_1.so",
+            "input_name": "data", 
+            "in_dim": [ 1, 3, 224, 224],
+            "out_dim": [1,1000],
+	    "out_order": [2],
+	    "num_runners": 8
+          }
+        },
+        "next_node": ["resnet50_post"]
+      },
+      {
+        "node_name": "resnet50_post",
+        "node_params": {
+          "classificationPostProcess": {}
+        },
+        "next_node": ["resnet50_accuracy"]
+      },
+       {
+        "node_name": "resnet50_accuracy",
+        "node_params": {
+          "ClassificationAccuracy": {
+            "ground_truth": "/workspace/tools/AKS/val_map.txt"
+          }
+        },
+        "next_node": []
+      }
+
+    ],
+    
+    "version": "0.1"
+  }
+  
