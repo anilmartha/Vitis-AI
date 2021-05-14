@@ -75,6 +75,8 @@ struct TVMNodeObject
   std::string lib;
   std::string input_name;
   DLContext ctx{kDLCPU, 0};
+  //DLTensor *in_data[12];
+  std::vector<DLTensor*> in_data;
   int dtype_code = kDLFloat;
   int dtype_bits = 32;
   int dtype_lanes = 1;
@@ -118,11 +120,9 @@ void TvmKernelBase::nodeInit(AKS::NodeParams *params)
   auto num_runners = params->hasKey<int>("num_runners") ? params->getValue<int>("num_runners") : 1;
   nodes[params].core_count = num_runners;
   auto lib = params->_stringParams["lib"];
-  //tvm::runtime::Module mod_factory = tvm::runtime::Module::LoadFromFile(lib);
+
   for (int i = 0; i < num_runners; i++)
   {
-
-  //  auto lib = params->_stringParams["lib"];
     auto input_name = params->_stringParams["input_name"];
     tvm::runtime::Module mod_factory = tvm::runtime::Module::LoadFromFile(lib);
     DLDevice ctx{kDLCPU, 0};
@@ -141,6 +141,14 @@ void TvmKernelBase::nodeInit(AKS::NodeParams *params)
 
     vector<int> out_dim = params->_intVectorParams["out_dim"];
     vector<int> out_order = params->_intVectorParams["out_order"];
+    vector<int64_t> in_dim_vec{in_dim[0], in_dim[1], in_dim[2], in_dim[3]};
+
+    DLTensor* temp_in;
+    nodes[params].in_data.push_back(temp_in);
+    TVMArrayAlloc(in_dim, nodes[params].in_ndim, nodes[params].dtype_code,
+		              nodes[params].dtype_bits, nodes[params].dtype_lanes,
+		              nodes[params].device_type, nodes[params].
+                  device_id, &(nodes[params].in_data[i]));
 
     nodes[params].out_shape = get_out_shape(out_dim, out_order);
   }
@@ -164,19 +172,14 @@ int TvmKernelBase::exec_async(
   in_dim[2] = indimIter->second[2]; //H;
   in_dim[3] = indimIter->second[3]; //W;
   vector<int64_t> in_dim_vec{in_dim[0], in_dim[1], in_dim[2], in_dim[3]};
-  DLTensor *in_data;
 
   for (int i = 0; i < 1; ++i)
   {
     float *inData = static_cast<float *>(in[i]->data());
     tvm::runtime::PackedFunc set_input = curRunners.GetFunction("set_input");
-    TVMArrayAlloc(in_dim, curNode.in_ndim, curNode.dtype_code,
-                  curNode.dtype_bits, curNode.dtype_lanes,
-                  curNode.device_type, curNode.device_id, &in_data);
-
     int64_t size = std::accumulate(in_dim_vec.begin(), in_dim_vec.end(), 1, std::multiplies<int64_t>());
-    TVMArrayCopyFromBytes(in_data, inData, size * 4);
-    set_input(curNode.input_name, in_data);
+    curNode.in_data[runnerID]->data = inData;
+    set_input(curNode.input_name, curNode.in_data[runnerID]);
   }
   
   tvm::runtime::PackedFunc run = curRunners.GetFunction("run");
@@ -194,9 +197,7 @@ int TvmKernelBase::exec_async(
     tvm::runtime::NDArray res = get_output(i);
     int64_t size = std::accumulate(curNode.out_shape[i].begin(), curNode.out_shape[i].end(), 1, std::multiplies<int64_t>());
     memcpy(outData, res->data, size * 4);
-  }
-
-  TVMArrayFree(in_data);
+  }  
 
   return -1;
 }
